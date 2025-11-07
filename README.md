@@ -61,17 +61,3 @@ The main detector is implemented as the `ShapeDetector` class in `src/main.ts`. 
 npm run build
 ```
 
-## License & attribution
-
-This project is provided as-is. Feel free to adapt the code for learning or demos.
-
----
-
-If you want, I can:
-- Run the app locally and show evaluation results against `ground_truth.json`.
-- Tweak the README further (add screenshots, badges, or contributor info).
-Let me know which you'd prefer.
-- Correctly identifying all shapes present in test images
-
-- Minimizing false positives (detecting shapes that aren't there)
-
