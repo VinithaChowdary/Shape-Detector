@@ -1,136 +1,77 @@
 # Shape Detection Challenge
 
-## Overview
 
-This challenge tests your ability to implement shape detection algorithms that can identify and classify the  geometric shapes in images:
 
-## Setup Instructions
+# Shape Detector
 
-### Prerequisites
+A small TypeScript web app that detects and classifies simple geometric shapes (circle, triangle, rectangle, pentagon, star) in images. The UI lets you upload images or use provided test SVGs and shows detected shapes with basic metadata.
 
-- Node.js (version 16 or higher)
-- npm or yarn package manager
+## Quick start
 
-### Installation
+Prerequisites:
+
+- Node.js 16+ and npm (or yarn)
+
+Install dependencies and start the dev server:
 
 ```bash
-# Install dependencies
+cd /path/to/shape-detector
 npm install
-
-# Start development server
 npm run dev
 ```
 
-### Project Structure
+Open http://localhost:5173 (or the port printed by Vite) in your browser.
+
+## Project structure
+
+Key files and folders:
 
 ```
 shape-detector/
-├── src/
-│   ├── main.ts          # Main application code (implement here)
-│   └── style.css        # Basic styling
-├── test-images/         # Test images directory
-├── expected_results.json # Expected detection results
-├── index.html          # Application UI
-└── README.md           # This file
+├── src/                   # TypeScript source
+│   ├── main.ts            # App entry + ShapeDetector implementation
+│   ├── evaluation.ts      # Evaluation helper / runner (optional)
+│   └── ...                # other UI and util modules
+├── test-images/           # Inline SVG test images used by the UI
+├── ground_truth.json      # Ground-truth data used by the optional evaluation runner
+├── index.html             # Application UI
+└── README.md              # This file
 ```
 
-## Challenge Requirements
+## Usage
 
-### Primary Task
+- Launch the dev server (`npm run dev`) and use the web UI to upload images.
+- Click a test image in the gallery to run detection on that built-in example.
+- For each detected shape the UI reports: type, confidence, center, and area.
 
-Implement the `detectShapes()` method in the `ShapeDetector` class located in `src/main.ts`. This method should:
+Programmatic usage:
 
-1. Analyze the provided `ImageData` object
-2. Detect all geometric shapes present in the image
-3. Classify each shape into one of the five required categories
-4. Return detection results with specified format
+The main detector is implemented as the `ShapeDetector` class in `src/main.ts`. It exposes:
 
-### Implementation Location
+- `loadImage(file: File): Promise<ImageData>` — load an image file into a canvas and return its ImageData.
+- `detectShapes(imageData: ImageData): Promise<DetectionResult>` — run detection and return a result object containing detected shapes and timing.
 
-```typescript
-// File: src/main.ts
-async detectShapes(imageData: ImageData): Promise<DetectionResult> {
-  // TODO: Implement your shape detection algorithm here
-  // This is where you write your code
-}
+## Development notes
+
+- The detection algorithm is implemented using pure browser APIs (Canvas ImageData) and geometric heuristics — no external CV libraries.
+- If you need to tune detection sensitivity (thresholds, area filtering, vertex heuristics), edit `src/main.ts` where helper heuristics are documented as comments.
+- To build for production:
+
+```bash
+npm run build
 ```
 
+## License & attribution
 
-## Test Images
+This project is provided as-is. Feel free to adapt the code for learning or demos.
 
-The `test-images/` directory contains 10 test images with varying complexity:
+---
 
-1. **Simple shapes** - Clean, isolated geometric shapes
-2. **Mixed scenes** - Multiple shapes in single image
-3. **Complex scenarios** - Overlapping shapes, noise, rotated shapes
-4. **Edge cases** - Very small shapes, partial occlusion
-5. **Negative cases** - Images with no detectable shapes
-
-See `expected_results.json` for detailed expected outcomes for each test image.
-
-## Evaluation Criteria
-
-Your implementation will be assessed on:
-
-### 1. Shape Detection Accuracy (40%)
-
+If you want, I can:
+- Run the app locally and show evaluation results against `ground_truth.json`.
+- Tweak the README further (add screenshots, badges, or contributor info).
+Let me know which you'd prefer.
 - Correctly identifying all shapes present in test images
+
 - Minimizing false positives (detecting shapes that aren't there)
-- Handling various shape sizes, orientations, and positions
-
-### 2. Classification Accuracy (30%)
-
-- Correctly classifying detected shapes into the right categories
-- Distinguishing between similar shapes (e.g., square vs. rectangle)
-- Handling edge cases and ambiguous shapes
-
-### 3. Precision Metrics (20%)
-
-- **Bounding Box Accuracy**: IoU > 0.7 with expected bounding boxes
-- **Center Point Accuracy**: < 10 pixels distance from expected centers
-- **Area Calculation**: < 15% error from expected area values
-- **Confidence Calibration**: Confidence scores should reflect actual accuracy
-
-### 4. Code Quality & Performance (10%)
-
-- Clean, readable, well-documented code
-- Efficient algorithms (< 2000ms processing time per image)
-- Proper error handling
-                |
-
-## Implementation Guidelines
-
-### Allowed Approaches
-
-- Computer vision algorithms (edge detection, contour analysis)
-- Mathematical shape analysis (geometric properties, ratios)
-- Pattern recognition techniques
-- Image processing operations
-- Any algorithm you can implement from scratch
-
-### Constraints
-
-- No external computer vision libraries (OpenCV, etc.)
-- Use only browser-native APIs and basic math operations
-- No pre-trained machine learning models
-- Work with the provided `ImageData` object format
-
-
-## Testing Your Solution
-
-1. Use the web interface to upload and test images
-2. Compare your results with `expected_results.json`
-3. Test with the provided test images
-4. Verify detection accuracy and confidence scores
-5. Check processing time performance
-
-## Submission Guidelines
-
-Your final submission should include:
-
-- Completed implementation in `src/main.ts`
-- Any additional helper functions or classes you created
-- Brief documentation of your approach (comments in code)
-- Test results or performance notes (optional)
-
 
