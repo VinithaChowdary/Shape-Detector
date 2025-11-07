@@ -42,10 +42,8 @@ export function calculateDistance(p1: { x: number; y: number }, p2: { x: number;
 }
 
 
-export function evaluateDetection(detected: any[], groundTruth: GroundTruthShape[], imageName: string): EvaluationMetrics {
+export function evaluateDetection(detected: any[], groundTruth: GroundTruthShape[], _imageName: string): EvaluationMetrics {
   const iouThreshold = 0.5;
-  const centerThreshold = 10; 
-  const areaThreshold = 0.15; 
   
   let truePositives = 0;
   let totalIoU = 0;

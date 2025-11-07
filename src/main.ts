@@ -47,12 +47,221 @@ export class ShapeDetector {
   async detectShapes(imageData: ImageData): Promise<DetectionResult> {
     const startTime = performance.now();
 
-    // TODO: Implement shape detection algorithm
+    // Basic CV pipeline implemented using only browser APIs and math.
+    // Steps:
+    // 1. Convert to grayscale and binary threshold
+    // 2. Find connected components (flood fill)
+    // 3. For each component compute bbox, area, centroid, boundary
+    // 4. Compute convex hull of boundary and use hull vertex count + circularity/solidity to classify
+
+    const width = imageData.width;
+    const height = imageData.height;
+    const data = imageData.data;
+
+    // Create binary mask where foreground pixels are 1
+    const mask = new Uint8ClampedArray(width * height);
+
+    // Simple threshold: treat nearly-white as background
+    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      mask[p] = lum < 250 ? 1 : 0;
+    }
+
+    const visited = new Uint8Array(width * height);
     const shapes: DetectedShape[] = [];
 
-    // Placeholder implementation
-    console.log("Shape detection not implemented yet");
-    console.log("Image dimensions:", imageData.width, "x", imageData.height);
+    const neighbors = [
+      -1,
+      1,
+      -width,
+      width,
+      -width - 1,
+      -width + 1,
+      width - 1,
+      width + 1,
+    ];
+
+    function idx(x: number, y: number) {
+      return y * width + x;
+    }
+
+    // Monotone chain convex hull
+    function convexHull(points: Point[]): Point[] {
+      if (points.length <= 1) return points.slice();
+      const pts = points
+        .map((p) => ({ x: p.x, y: p.y }))
+        .sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+
+      const cross = (o: Point, a: Point, b: Point) =>
+        (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+      const lower: Point[] = [];
+      for (const p of pts) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+          lower.pop();
+        }
+        lower.push(p);
+      }
+
+      const upper: Point[] = [];
+      for (let i = pts.length - 1; i >= 0; i--) {
+        const p = pts[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+          upper.pop();
+        }
+        upper.push(p);
+      }
+
+      upper.pop();
+      lower.pop();
+      return lower.concat(upper);
+    }
+
+    function polygonArea(points: Point[]): number {
+      let a = 0;
+      for (let i = 0; i < points.length; i++) {
+        const j = (i + 1) % points.length;
+        a += points[i].x * points[j].y - points[j].x * points[i].y;
+      }
+      return Math.abs(a) / 2;
+    }
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const id = idx(x, y);
+        if (mask[id] && !visited[id]) {
+          const stack = [id];
+          visited[id] = 1;
+
+          let minX = x,
+            maxX = x,
+            minY = y,
+            maxY = y;
+          let area = 0;
+          let sumX = 0,
+            sumY = 0;
+
+          const componentPoints: Point[] = [];
+
+          while (stack.length) {
+            const cur = stack.pop()!;
+            const cy = Math.floor(cur / width);
+            const cx = cur % width;
+
+            area++;
+            sumX += cx;
+            sumY += cy;
+            componentPoints.push({ x: cx, y: cy });
+
+            if (cx < minX) minX = cx;
+            if (cx > maxX) maxX = cx;
+            if (cy < minY) minY = cy;
+            if (cy > maxY) maxY = cy;
+
+            for (const n of neighbors) {
+              const ni = cur + n;
+              if (ni < 0 || ni >= width * height) continue;
+              if (visited[ni]) continue;
+              const ny = Math.floor(ni / width);
+              const nx = ni % width;
+              if (Math.abs(nx - cx) > 1 || Math.abs(ny - cy) > 1) continue;
+              if (mask[ni]) {
+                visited[ni] = 1;
+                stack.push(ni);
+              }
+            }
+          }
+
+          // ignore tiny noise
+          if (area < 20) continue;
+
+          const bbox = {
+            x: minX,
+            y: minY,
+            width: maxX - minX + 1,
+            height: maxY - minY + 1,
+          };
+
+          const center = { x: sumX / area, y: sumY / area };
+
+          // boundary points
+          const boundary: Point[] = [];
+          for (const p of componentPoints) {
+            const i0 = idx(p.x, p.y);
+            let isEdge = false;
+            for (const n of neighbors) {
+              const ni = i0 + n;
+              if (ni < 0 || ni >= width * height) continue;
+              const ny = Math.floor(ni / width);
+              const nx = ni % width;
+              if (Math.abs(nx - p.x) > 1 || Math.abs(ny - p.y) > 1) continue;
+              if (!mask[ni]) {
+                isEdge = true;
+                break;
+              }
+            }
+            if (isEdge) boundary.push(p);
+          }
+
+          const perimeter = boundary.length || Math.sqrt(area) * 4;
+
+          const hull = convexHull(boundary.length ? boundary : componentPoints);
+          const hullArea = hull.length >= 3 ? polygonArea(hull) : area;
+          const hullVertices = hull.length;
+
+          const circularity = perimeter > 0 ? (4 * Math.PI * area) / (perimeter * perimeter) : 0;
+          const solidity = hullArea > 0 ? area / hullArea : 0;
+
+          // classification heuristics
+          let type: DetectedShape["type"] = "rectangle";
+          let confidence = 0.6;
+
+          if (circularity > 0.7 && solidity > 0.8 && hullVertices > 8) {
+            type = "circle";
+            confidence = 0.7 + Math.min(0.29, (circularity - 0.7));
+          } else if (hullVertices === 3) {
+            type = "triangle";
+            confidence = 0.7 + Math.min(0.29, solidity);
+          } else if (hullVertices === 4) {
+            type = "rectangle";
+            const ar = bbox.width / bbox.height;
+            const arScore = 1 - Math.abs(1 - ar);
+            confidence = 0.6 + Math.min(0.39, arScore * 0.6 + solidity * 0.4);
+          } else if (hullVertices === 5) {
+            type = "pentagon";
+            confidence = 0.65 + Math.min(0.34, solidity);
+          } else {
+            if (hullVertices >= 5 && solidity < 0.8 && hullVertices >= 8) {
+              type = "star";
+              confidence = 0.6 + Math.min(0.39, (0.8 - solidity));
+            } else if (hullVertices >= 6 && solidity > 0.9) {
+              type = "circle";
+              confidence = 0.6 + Math.min(0.39, circularity);
+            } else if (hullVertices >= 6) {
+              type = solidity < 0.75 ? "star" : "pentagon";
+              confidence = 0.55 + Math.min(0.44, solidity);
+            } else {
+              type = "rectangle";
+              confidence = 0.5 + Math.min(0.49, solidity);
+            }
+          }
+
+          if (!isFinite(confidence) || confidence <= 0) confidence = 0.5;
+          if (confidence > 0.99) confidence = 0.99;
+
+          shapes.push({
+            type,
+            confidence,
+            boundingBox: bbox,
+            center,
+            area,
+          });
+        }
+      }
+    }
 
     const processingTime = performance.now() - startTime;
 
